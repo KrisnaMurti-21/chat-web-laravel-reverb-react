@@ -13,6 +13,7 @@ function Chat({ friend, currentUser }) {
     const messagesContainerRef = useRef(null);
     const isFriendTypingTimerRef = useRef(null);
 
+    // Fetch messages on component mount
     useEffect(() => {
         const fetchMessages = async () => {
             const response = await axios.get(
@@ -21,16 +22,20 @@ function Chat({ friend, currentUser }) {
             setMessages(response.data);
         };
         fetchMessages();
+    }, [friend.id]);
+
+    // Setup event listeners for real-time updates
+    useEffect(() => {
         const chatChannel = Echo.private(`chat.${currentUser.id}`);
 
         chatChannel.listen("MessageSent", (response) => {
+            console.log(response);
             setMessages((prevMessages) => [...prevMessages, response.message]);
         });
 
-        chatChannel.listenForWhisper(
-            "typing",
-            (response) => {
-                setIsFriendTyping(response.userId === friend.id);
+        chatChannel.listenForWhisper("typing", (response) => {
+            if (response.userId === friend.id) {
+                setIsFriendTyping(true);
 
                 if (isFriendTypingTimerRef.current) {
                     clearTimeout(isFriendTypingTimerRef.current);
@@ -39,15 +44,24 @@ function Chat({ friend, currentUser }) {
                 isFriendTypingTimerRef.current = setTimeout(() => {
                     setIsFriendTyping(false);
                 }, 1000);
-            },
-            [friend.id, currentUser.id]
-        );
+            }
+        });
 
         return () => {
             chatChannel.stopListening("MessageSent");
             chatChannel.stopListeningForWhisper("typing");
         };
-    });
+    }, [currentUser.id, friend.id]); // Ensure this effect runs only once per user and friend
+
+    // Auto-scroll to the bottom when messages change
+    useEffect(() => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: "smooth",
+            });
+        }
+    }, [messages]);
 
     const sendMessage = async () => {
         if (newMessage.trim() !== "" || newMedia) {
@@ -80,32 +94,23 @@ function Chat({ friend, currentUser }) {
     };
 
     const sendTypingEvent = () => {
-        if (messages.length !== 0) {
+        if (newMessage.trim() !== "") {
             Echo.private(`chat.${friend.id}`).whisper("typing", {
                 userId: currentUser.id,
             });
         }
     };
 
-    useEffect(() => {
-        if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTo({
-                top: messagesContainerRef.current.scrollHeight,
-                behavior: "smooth",
-            });
-        }
-    }, [messages]);
-
     return (
         <AuthenticatedLayout
             header={
-                <h2 className=" font-semibold leading-tight text-gray-800 dark:text-gray-200">
+                <h2 className="font-semibold leading-tight text-gray-800 dark:text-gray-200">
                     Chat with {friend.name}
                 </h2>
             }
         >
             <Head title="Chat" />
-            <div className="mx-auto max-w-7xl sm:px-6 lg-px-8">
+            <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                 <div className="flex flex-col justify-end h-[70vh]">
                     <div
                         ref={messagesContainerRef}
@@ -161,7 +166,7 @@ function Chat({ friend, currentUser }) {
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
-                        className="ml-4 bg-slate-300 text-sm  file:cursor-pointer cursor-pointer file:border-0 file:py-2 file:px-4 file:mr-4 file:bg-gray-800 file:hover:bg-gray-700 file:text-white rounded-lg"
+                        className="ml-4 bg-slate-300 text-sm file:cursor-pointer cursor-pointer file:border-0 file:py-2 file:px-4 file:mr-4 file:bg-gray-800 file:hover:bg-gray-700 file:text-white rounded-lg"
                     />
                     <PrimaryButton
                         onClick={sendMessage}

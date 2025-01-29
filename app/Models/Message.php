@@ -9,7 +9,8 @@ class Message extends Model
     protected $fillable = [
         'sender_id',
         'receiver_id',
-        'text'
+        'text',
+        'media_path',
     ];
 
     public function sender()

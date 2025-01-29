@@ -39,13 +39,20 @@ class MessageController extends Controller
     // Mengirim data dari yang ngetik
     public function sendMessage(Request $request, User $friend)
     {
+        $mediaPath = null;
+
+        if ($request->hasFile('media')) {
+            $mediaPath = $request->file('media')->store('media', 'public');
+        }
         $message = Message::create([
             'sender_id' => Auth::user()->id,
             'receiver_id' => $friend->id,
-            'text' => $request->message
+            'text' => $request->message,
+            'media_path' => $mediaPath
         ]);
 
         broadcast(new MessageSent($message));
+        // broadcast(new MessageSent($message))->toOthers();
 
         return $message;
     }
